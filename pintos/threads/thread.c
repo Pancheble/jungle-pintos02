@@ -26,6 +26,7 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
+// 실행 대기
 static struct list ready_list;
 
 /* Idle thread. */
@@ -106,6 +107,7 @@ thread_init (void) {
 	lgdt (&gdt_ds);
 
 	/* Init the globla thread context */
+	// 초기화
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);

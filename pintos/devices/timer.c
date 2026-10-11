@@ -23,6 +23,8 @@ static int64_t ticks;
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
+// timer_sleep으로 잠든 스레드 목록. wakeup_tick 오름차순
+static struct list sleep_list;
 
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
@@ -42,6 +44,7 @@ timer_init (void) {
 	outb (0x40, count & 0xff);
 	outb (0x40, count >> 8);
 
+	list_init (&sleep_list);
 	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -86,15 +89,29 @@ int64_t
 timer_elapsed (int64_t then) {
 	return timer_ticks () - then;
 }
-
+// 비교 함수, sleep리스트 정렬.
+static bool
+wakeup_less(const struct list_elem *a, const struct list_elem *b,  void *aux UNUSED){
+	struct thread *ta = list_entry (a, struct thread, elem);
+	struct thread *tb = list_entry (b, struct thread, elem);
+	return ta->wakeup_tick < tb->wakeup_tick;
+}
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
+	struct thread *curr = thread_current();
+	enum intr_level old_level;
 
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	if (ticks <= 0){
+		return;
+	}
+	old_level = intr_disable();
+	curr->wakeup_tick = start + ticks;
+	list_insert_ordered (&sleep_list, &curr->elem, wakeup_less, NULL);
+	thread_block();
+	intr_set_level(old_level);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -126,6 +143,16 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+
+	// 깰 시간이 된 스레드를 깨움
+	while(!list_empty(&sleep_list)){
+		struct thread *t = list_entry(list_front(&sleep_list), struct thread, elem);
+		if (t->wakeup_tick > ticks){
+			break;
+		}
+		list_pop_front(&sleep_list);
+		thread_unblock(t);
+	}
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

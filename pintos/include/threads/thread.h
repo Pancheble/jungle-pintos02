@@ -90,9 +90,11 @@ struct thread {
 	tid_t tid;                          /* Thread identifier. */
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
-	int priority;                       /* Priority. */
+	int priority;                       /* Priority. 우선순위 */
+	int64_t wakeup_tick;				// 스레드가 꺠어나야 할 절대 시각 64비트 정수로 저장
 
 	/* Shared between thread.c and synch.c. */
+	// 이중 연결 리스트
 	struct list_elem elem;              /* List element. */
 
 #ifdef USERPROG
