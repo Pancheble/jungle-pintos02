@@ -25,7 +25,7 @@
 #endif
 
 /* Sizes of process args*/
-#define MAX_ARGS 64
+#define MAX_ARGS 32
 
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
